@@ -1,0 +1,19 @@
+name = "PvsNP"
+version = "0.1.0"
+keywords = ["math"]
+defaultTargets = ["PvsNP"]
+
+[leanOptions]
+pp.unicode.fun = true # pretty-prints `fun a ↦ b`
+relaxedAutoImplicit = false
+weak.linter.mathlibStandardSet = true
+weak.linter.style.header = false # The project uses module docs without a license header.
+maxSynthPendingDepth = 3
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.36.0"
+
+[[lean_lib]]
+name = "PvsNP"
