@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this formalization, cite the repository and the commit you used."
+title: "P vs. NP in Lean"
+type: software
+authors:
+  - name: "P vs. NP in Lean project"
+repository-code: "https://github.com/dean-jordan/p-vs-np"
+references:
+  - type: report
+    title: "The P Versus NP Problem"
+    authors:
+      - family-names: Cook
+        given-names: Stephen
+    url: "https://www.claymath.org/wp-content/uploads/2022/06/pvsnp.pdf"

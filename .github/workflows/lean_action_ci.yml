@@ -11,7 +11,81 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      LEAN_NUM_THREADS: "1"
 
     steps:
       - uses: actions/checkout@v7
-      - uses: leanprover/lean-action@v1
+      - name: Set up Lean and cache Mathlib
+        uses: leanprover/lean-action@v1
+        with:
+          auto-config: false
+          use-mathlib-cache: true
+      - name: Build from clean project outputs with warnings as errors
+        run: |
+          lake clean PvsNP
+          lake build --wfail
+      - name: Audit axioms for results and bridges
+        shell: bash
+        run: |
+          audit=PvsNP/Verification/Axioms.lean
+          log="$RUNNER_TEMP/pvsnp-axioms.log"
+          lake env lean "$audit" | tee "$log"
+          python3 - "$audit" "$log" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          source, output = (Path(path).read_text() for path in sys.argv[1:])
+          expected = re.findall(r"^#print axioms[ \t]+(\S+)", source, re.MULTILINE)
+          reports = re.findall(
+              r"^'([^\n]+)' (?:depends on axioms: \[([^\]]*)\]|does not depend on any axioms)$",
+              output, re.MULTILINE,
+          )
+          if not expected or [name for name, _ in reports] != expected:
+              sys.exit("Axiom reports did not match the declarations in the audit file.")
+
+          allowed = {"propext", "Classical.choice", "Quot.sound"}
+          for name, dependencies in reports:
+              unexpected = {axiom.strip() for axiom in dependencies.split(",") if axiom.strip()}
+              unexpected -= allowed
+              if unexpected:
+                  sys.exit(f"{name} uses unexpected axioms: {', '.join(sorted(unexpected))}")
+          print(f"Checked the axiom allowlist for {len(reports)} declarations.")
+          PY
+      - name: Replay the checked modules in fresh kernel environments
+        run: |
+          lake env leanchecker --fresh PvsNP.Complexity.CircuitReductions
+          lake env leanchecker --fresh PvsNP.Complexity.CountingVerifierBounds
+          lake env leanchecker --fresh PvsNP.MCSP.ClockedPrefixOracle
+          lake env leanchecker --fresh PvsNP.MCSP.NestedPairRegister
+          lake env leanchecker --fresh PvsNP.MCSP.GateBlockRegister
+          lake env leanchecker --fresh PvsNP.MCSP.PaddedDescriptionRegister
+          lake env leanchecker --fresh PvsNP.MCSP.CheckedDescriptionRegister
+          lake env leanchecker --fresh PvsNP.MCSP.TraceQueryLayout
+          lake env leanchecker --fresh PvsNP.MCSP.TraceCertificateLayout
+          lake env leanchecker --fresh PvsNP.MCSP.StructuredVerifier
+          lake env leanchecker --fresh PvsNP.MCSP.TraceCertificateDispatch
+          lake env leanchecker --fresh PvsNP.MCSP.TraceInputRegister
+          lake env leanchecker --fresh PvsNP.MCSP.MagnificationClock
+          lake env leanchecker --fresh PvsNP.MCSP.VerifierProgram
+          lake env leanchecker --fresh PvsNP.TuringMachine.OneWayInput
+          lake env leanchecker --fresh PvsNP.TuringMachine.Registers.PackedPairDecision
+          lake env leanchecker --fresh PvsNP.MCSP.MergeWitness
+          lake env leanchecker --fresh PvsNP.MCSP.StreamResources
+          lake env leanchecker --fresh PvsNP.MCSP.ViolationCNF
+          lake env leanchecker --fresh PvsNP.SAT.CircuitBinaryBasisSize
+          lake env leanchecker --fresh PvsNP.SAT.CircuitNegationSize
+          lake env leanchecker --fresh PvsNP.SAT.CircuitParitySize
+          lake env leanchecker --fresh PvsNP.SAT.Completeness
+          lake env leanchecker --fresh PvsNP.SAT.CrossingPaletteWorstCase
+          lake env leanchecker --fresh PvsNP.SAT.CrossingPowerBound
+          lake env leanchecker --fresh PvsNP.SAT.CrossingTimeLowerBound
+          lake env leanchecker --fresh PvsNP.SAT.VerifierMachine
+          lake env leanchecker --fresh PvsNP.SAT.AssignmentQueryLowerBound
+          lake env leanchecker --fresh PvsNP.SAT.PigeonholeLowerBound
+          lake env leanchecker --fresh PvsNP.SAT.SearchCircuits
+          lake env leanchecker --fresh PvsNP.SAT.OracleCalls
+          lake env leanchecker --fresh PvsNP.SAT.OracleWorkspace
+          lake env leanchecker --fresh PvsNP.SAT.QueryLoopProgram
+          lake env leanchecker --fresh PvsNP
